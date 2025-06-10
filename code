@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>FoodFlip</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Montserrat', sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f0f2f5;
+      color: #333;
+    }
+    h2, h3, h4 {
+      color: #222;
+      margin-top: 0;
+      font-size: 1.2rem;
+    }
+    /* Кнопки: без градієнту, із круглішими кутами, збільшені для мобільних */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 24px;
+      margin: 8px 0;
+      width: 100%;
+      max-width: 240px;
+      border: none;
+      border-radius: 12px;
+      background: #2980B9;
+      color: white;
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.3s ease, transform 0.2s ease;
+    }
+    .btn:hover:not(:disabled) {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    /* Оновлений стиль для кнопки "Виключити" */
+    .btn-danger {
+      background: #e74c3c;         /* Більш приємний червоний відтінок */
+      border-radius: 20px;         /* Сильно округлені кути */
+      color: #fff;
+      padding: 14px 24px;
+      font-size: 18px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    .btn-danger:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .btn-danger:active:not(:disabled) {
+      transform: scale(0.97);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .section {
+      display: none;
+      margin-top: 24px;
+    }
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal {
+      background: #fff;
+      padding: 20px;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 360px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .modal img {
+      width: 140px;
+      height: 140px;
+      object-fit: cover;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .item {
+      background: #fff;
+      padding: 16px;
+      margin: 12px 0;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+    .item.disabled {
+      opacity: 0.5;
+      text-decoration: line-through;
+    }
+    .item-info {
+      display: flex;
+      align-items: center;
+    }
+    .item img {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-right: 12px;
+    }
+    .item-details {
+      line-height: 1.4;
+      font-size: 16px;
+    }
+    .navigation-buttons {
+      margin-top: 20px;
+      text-align: right;
+    }
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    .filters label {
+      font-size: 16px;
+    }
+    .filters input {
+      width: 60px;
+      margin-left: 8px;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    @media (max-width: 480px) {
+      .btn {
+        font-size: 16px;
+        padding: 12px 20px;
+        max-width: 100%;
+      }
+      .item-details {
+        font-size: 14px;
+      }
+      .filters input {
+        width: 50px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>Вибери розділ меню:</h2>
+  <button class="btn" onclick="selectCategory('burgers')">🍔 Бургери та роли</button>
+  <button class="btn" onclick="selectCategory('chicken')">🍗 Курка</button>
+  <button class="btn" onclick="selectCategory('fries')">🍟 Картопля/Каша/Салати</button>
+  <button class="btn" onclick="selectCategory('drinks')">🥤 Напої</button>
+  <button class="btn" onclick="selectCategory('coffee')">☕ Кава</button>
+  <button class="btn" onclick="selectCategory('desserts')">🍰 Десерти</button>
+  <button class="btn" onclick="selectCategory('happyMeal')">🧃 Хеппі Міл</button>
+  <button class="btn" onclick="selectCategory('breakfast')">🍳 Сніданок</button>
+
+  <!-- Меню обраного розділу -->
+  <div id="menuSection" class="section">
+    <h3>Розділ: <span id="categoryName"></span></h3>
+    <div class="filters">
+      <label>Макс. калорії:<input type="number" id="calorieFilter" value="1000"></label>
+      <label>Макс. ціна (₴):<input type="number" id="priceFilter" value="1000"></label>
+      <button class="btn" onclick="filterAndPick()">🎲 Рандом</button>
+    </div>
+    <div id="dishList"></div>
+  </div>
+
+  <!-- Модальне вікно для вибраної страви -->
+  <div id="dishModalOverlay" class="modal-overlay">
+    <div class="modal" id="dishModal">
+      <img id="modalDishImg" src="" alt="Dish Image">
+      <h3 id="modalDishName"></h3>
+      <div class="navigation-buttons">
+        <button class="btn" onclick="chooseOnlyDish()">Тільки страву</button>
+        <button class="btn" id="modalMenuBtn" style="display: none;" onclick="chooseMenu()">Вибрати меню</button>
+        <button class="btn" onclick="pickAnotherDish()">Інше (рандомно)</button>
+      </div>
+      <div style="margin-top:10px;">
+        <button id="modalExcludeBtn" class="btn-danger" onclick="excludeCurrentDish()">Виключити з рандома</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Секція створення меню (тільки для бургерів) -->
+  <div id="menuBuilderSection" class="section">
+    <h3>Створити меню McDonald's</h3>
+
+    <!-- Вкладки: 1. Блюдо, 2. Соуси, 3. Напої -->
+    <div id="dishesTab" class="tab active">
+      <h4>1. Оберіть страву (з трьох):</h4>
+      <div id="firstChoices"></div>
+      <div class="navigation-buttons">
+        <button id="randomDishBtn" class="btn" onclick="randomizeBuilderDish()">🎲 Рандом блюдо</button>
+        <button id="toSaucesBtn" class="btn" onclick="toSauces()" disabled>Далі: Соуси</button>
+      </div>
+    </div>
+
+    <div id="saucesTab" class="tab">
+      <h4>2. Оберіть соус:</h4>
+      <div id="saucesList"></div>
+      <div class="navigation-buttons">
+        <button class="btn" onclick="backToDishes()">Назад</button>
+        <button id="randomSauceBtn" class="btn" onclick="randomizeBuilderSauce()">🎲 Рандом соус</button>
+        <button id="toDrinksBtn" class="btn" onclick="toDrinks()" disabled>Далі: Напої</button>
+      </div>
+    </div>
+
+    <div id="drinksTab" class="tab">
+      <h4>3. Оберіть напій:</h4>
+      <div id="drinksList"></div>
+      <div class="navigation-buttons">
+        <button class="btn" onclick="backToSauces()">Назад</button>
+        <button id="randomDrinkBtn" class="btn" onclick="randomizeBuilderDrink()">🎲 Рандом напій</button>
+        <button id="finishMenuBtn" class="btn" onclick="finishMenu()" disabled>Завершити меню</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    Telegram.WebApp.ready();
+
+    // === ДАНІ: РОЗДІЛИ ТА СТРАВИ ===
+    const menuCategories = {
+      burgers: [
+        { name: "Біг Мак®", calories: 526, price: 141, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3413_BigMac.png", hasMenu: true },
+        { name: "Біг Тейсті Сингл", calories: 620, price: 192, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_3442_Sdwch_Big_Tasty_Single.jpg", hasMenu: true },
+        { name: "Тейсті Джуніор", calories: 400, price: 104, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_3441_Sdwch_Big_Tasty_Junior.jpg", hasMenu: true },
+        { name: "Дабл Біг Тейсті", calories: 880, price: 271, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_3443_Sdwch_Big_Tasty_Double.jpg", hasMenu: true },
+        { name: "Дабл Роял Чізбургер", calories: 760, price: 240, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3415_DoubleRoyalCheeseburger_2.png", hasMenu: true },
+        { name: "Роял Чізбургер", calories: 530, price: 161, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3414_RoyalCheeseburger_2.png", hasMenu: true },
+        { name: "МакЧікен", calories: 448, price: 119, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3416_McChicken.png", hasMenu: true },
+        { name: "Філе-о-Фіш", calories: 379, price: 117, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3412_File-o-Fish_2025.png", hasMenu: true },
+        { name: "Дабл Чізбургер", calories: 475, price: 121, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3411_DoubleCheeseburger.png", hasMenu: true },
+        { name: "Чізбургер", calories: 298, price: 73, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3409_Cheeseburger.png", hasMenu: true },
+        { name: "Гамбургер", calories: 249, price: 63, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3408_Hamburger.png", hasMenu: true },
+        { name: "Чікен МакНагетс 6шт", calories: 265, price: 101, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_2130_Nuggets_6.png", hasMenu: true },
+        { name: "Чікен МакНагетс 9шт", calories: 398, price: 145, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_2131_Nuggets_9.png", hasMenu: true },
+        { name: "Чікен Джуніор", calories: 330, price: 73, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3426_CHICKEN_JUNIOR_BEST.png", hasMenu: true },
+        { name: "Курячі стріпси 3шт", calories: 200, price: 97, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3500_3strips.png", hasMenu: true }
+      ],
+      chicken: [
+        { name: "Чікен МакНагетс 6шт", calories: 265, price: 101, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_2130_Nuggets_6.png", hasMenu: false },
+        { name: "Чікен МакНагетс 9шт", calories: 398, price: 145, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_2131_Nuggets_9.png", hasMenu: false },
+        { name: "Чікен Джуніор", calories: 330, price: 73, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3426_CHICKEN_JUNIOR_BEST.png", hasMenu: false },
+        { name: "Курячі стріпси 3шт", calories: 200, price: 97, img: "https://d3tqkqn8yl74v5.cloudfront.net/TPO-chf_ua_3500_3strips.png", hasMenu: false }
+      ],
+      fries: [
+        { name: "Картопля Фрі", calories: 312, price: 55, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Картопля по-селянськи", calories: 340, price: 65, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Салат Цезар", calories: 180, price: 75, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Каша", calories: 150, price: 45, img: "https://via.placeholder.com/60", hasMenu: false }
+      ],
+      drinks: [
+        { name: "Coca-Cola", calories: 140, price: 45, img: "https://i.imgur.com/UyjY9v2.png", hasMenu: false },
+        { name: "Fanta", calories: 160, price: 45, img: "https://i.imgur.com/PQXtJQx.png", hasMenu: false },
+        { name: "Sprite", calories: 150, price: 45, img: "https://i.imgur.com/JkKz0Wb.png", hasMenu: false },
+        { name: "Сік Апельсиновий", calories: 110, price: 50, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Вода", calories: 0, price: 30, img: "https://i.imgur.com/7sA5C2x.png", hasMenu: false }
+      ],
+      coffee: [
+        { name: "Еспресо", calories: 5, price: 40, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Американо", calories: 10, price: 45, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Капучино", calories: 120, price: 60, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Лате", calories: 150, price: 65, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Американо Фреш", calories: 15, price: 50, img: "https://via.placeholder.com/60", hasMenu: false }
+      ],
+      desserts: [
+        { name: "МакФлурі", calories: 230, price: 55, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "МакПиріг® Полуниця", calories: 280, price: 50, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Морозиво Ванільне", calories: 200, price: 45, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Шоколадний Маффін", calories: 330, price: 65, img: "https://via.placeholder.com/60", hasMenu: false }
+      ],
+      happyMeal: [
+        { name: "Хеппі Міл з нагетсами", calories: 500, price: 160, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Хеппі Міл з бургером", calories: 550, price: 170, img: "https://via.placeholder.com/60", hasMenu: false }
+      ],
+      breakfast: [
+        { name: "МакМафін з яйцем та сиром", calories: 300, price: 75, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "МакМафін з яйцем та беконом", calories: 350, price: 85, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "МакМафін Фреш", calories: 320, price: 90, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Тост з сиром та беконом", calories: 360, price: 80, img: "https://via.placeholder.com/60", hasMenu: false },
+        { name: "Каша", calories: 150, price: 45, img: "https://via.placeholder.com/60", hasMenu: false }
+      ]
+    };
+
+    const sauces = [
+      { name: "Кетчуп" },
+      { name: "Гарбузовий соус" },
+      { name: "Сирний соус" },
+      { name: "Часниковий соус" },
+      { name: "Чилі соус" }
+    ];
+
+    const drinksForBuilder = [
+      { name: "Coca-Cola", img: "https://i.imgur.com/UyjY9v2.png" },
+      { name: "Fanta", img: "https://i.imgur.com/PQXtJQx.png" },
+      { name: "Sprite", img: "https://i.imgur.com/JkKz0Wb.png" },
+      { name: "Вода", img: "https://i.imgur.com/7sA5C2x.png" },
+      { name: "Чай холодний", img: "https://i.imgur.com/VBoXu3q.png" }
+    ];
+
+    const firstChoices = [
+      { name: "Картопля фрі", img: "https://i.imgur.com/3pZe5kq.png" },
+      { name: "Діпи",       img: "https://i.imgur.com/Cl8vQTo.png" },
+      { name: "Салат",      img: "https://i.imgur.com/ODQ6oTs.png" }
+    ];
+
+    let selectedCategory = '';
+    let excludedDishes = new Set();
+    let currentPickedDish = null;
+
+    let builderSelection = {
+      dish: null,
+      sauce: null,
+      drink: null,
+      excludedBuilderDishes: new Set()
+    };
+
+    // Вибір розділу меню
+    function selectCategory(category) {
+      selectedCategory = category;
+      document.getElementById("menuSection").style.display = "block";
+      document.getElementById("menuBuilderSection").style.display = "none";
+      document.getElementById("categoryName").textContent = getCategoryLabel(category);
+      excludedDishes.clear();
+      renderMenu();
+    }
+
+    function getCategoryLabel(cat) {
+      switch(cat) {
+        case 'burgers': return "Бургери та роли";
+        case 'chicken': return "Курка";
+        case 'fries': return "Картопля/Каша/Салати";
+        case 'drinks': return "Напої";
+        case 'coffee': return "Кава";
+        case 'desserts': return "Десерти";
+        case 'happyMeal': return "Хеппі Міл";
+        case 'breakfast': return "Сніданок";
+        default: return "";
+      }
+    }
+
+    // Відобразити список страв обраного розділу
+    function renderMenu() {
+      const container = document.getElementById("dishList");
+      container.innerHTML = '';
+      const list = menuCategories[selectedCategory] || [];
+      list.forEach(dish => {
+        const isExcluded = excludedDishes.has(dish.name);
+        const div = document.createElement("div");
+        div.className = "item" + (isExcluded ? " disabled" : "");
+        const imgSrc = dish.img || "https://via.placeholder.com/60";
+        div.innerHTML = `
+          <div class="item-info">
+            <img src="${imgSrc}" alt="${dish.name}">
+            <div class="item-details">
+              <strong>${dish.name}</strong><br>
+              ${dish.calories} ккал — ₴${dish.price.toFixed(2)}
+            </div>
+          </div>
+          <div class="navigation-buttons">
+            <button class="btn" onclick="pickThisDish('${dish.name}')" ${isExcluded ? 'disabled' : ''}>
+              Вибрати
+            </button>
+            <button class="btn-danger" onclick="toggleDish('${dish.name}')">
+              ${isExcluded ? "Включити" : "Виключити"}
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function toggleDish(name) {
+      if (excludedDishes.has(name)) {
+        excludedDishes.delete(name);
+      } else {
+        excludedDishes.add(name);
+      }
+      renderMenu();
+    }
+
+    function pickThisDish(name) {
+      const list = menuCategories[selectedCategory] || [];
+      const dish = list.find(d => d.name === name);
+      if (!dish) return;
+      showDishModal(dish);
+    }
+
+    function filterAndPick() {
+      const maxCalories = parseInt(document.getElementById("calorieFilter").value) || Infinity;
+      const maxPrice = parseFloat(document.getElementById("priceFilter").value) || Infinity;
+      const list = menuCategories[selectedCategory] || [];
+      const filtered = list.filter(d =>
+        d.calories <= maxCalories &&
+        d.price <= maxPrice &&
+        !excludedDishes.has(d.name)
+      );
+      if (filtered.length === 0) {
+        alert("Немає відповідних страв 😕");
+        return;
+      }
+      const pick = filtered[Math.floor(Math.random() * filtered.length)];
+      showDishModal(pick);
+    }
+
+    function showDishModal(dish) {
+      currentPickedDish = dish;
+      const imgSrc = dish.img || "https://via.placeholder.com/160";
+      document.getElementById("modalDishImg").src = imgSrc;
+      document.getElementById("modalDishName").textContent = dish.name;
+      document.getElementById("modalExcludeBtn").textContent =
+        excludedDishes.has(dish.name) ? "Включити з рандома" : "Виключити з рандома";
+
+      const menuBtn = document.getElementById("modalMenuBtn");
+      if (dish.hasMenu) {
+        menuBtn.style.display = "inline-flex";
+      } else {
+        menuBtn.style.display = "none";
+      }
+
+      document.getElementById("dishModalOverlay").style.display = "flex";
+    }
+
+    function closeDishModal() {
+      document.getElementById("dishModalOverlay").style.display = "none";
+      currentPickedDish = null;
+    }
+
+    function pickAnotherDish() {
+      closeDishModal();
+      filterAndPick();
+    }
+
+    function excludeCurrentDish() {
+      if (!currentPickedDish) return;
+      const name = currentPickedDish.name;
+      if (excludedDishes.has(name)) {
+        excludedDishes.delete(name);
+      } else {
+        excludedDishes.add(name);
+      }
+      closeDishModal();
+      renderMenu();
+    }
+
+    function chooseOnlyDish() {
+      if (!currentPickedDish) return;
+      const name = currentPickedDish.name;
+      closeDishModal();
+      alert(`Ви обрали страву: ${name}`);
+    }
+
+    function chooseMenu() {
+      if (!currentPickedDish) return;
+      closeDishModal();
+      openMenuBuilder(currentPickedDish);
+    }
+
+    // --- Білдер меню (тільки для «burgers») ---
+    function openMenuBuilder(prefilledDish = null) {
+      selectedCategory = 'burgers';
+      document.getElementById("menuSection").style.display = "none";
+      document.getElementById("menuBuilderSection").style.display = "block";
+      builderSelection = { dish: null, sauce: null, drink: null, excludedBuilderDishes: new Set() };
+
+      document.getElementById('dishesTab').classList.add('active');
+      document.getElementById('saucesTab').classList.remove('active');
+      document.getElementById('drinksTab').classList.remove('active');
+
+      if (prefilledDish) {
+        builderSelection.dish = prefilledDish;
+        renderFirstChoices(true);
+        document.getElementById("toSaucesBtn").disabled = false;
+      } else {
+        renderFirstChoices(false);
+        document.getElementById("toSaucesBtn").disabled = true;
+      }
+      renderSaucesList();
+      renderDrinksList();
+      document.getElementById("toDrinksBtn").disabled = true;
+      document.getElementById("finishMenuBtn").disabled = true;
+    }
+
+    function renderFirstChoices(prefilled = false) {
+      const container = document.getElementById("firstChoices");
+      container.innerHTML = '';
+      if (prefilled && builderSelection.dish) {
+        const d = builderSelection.dish;
+        const div = document.createElement("div");
+        div.className = "item";
+        const imgSrc = d.img || "https://via.placeholder.com/60";
+        div.innerHTML = `
+          <div class="item-info">
+            <img src="${imgSrc}" alt="${d.name}">
+            <div class="item-details">
+              <strong>${d.name}</strong>
+            </div>
+          </div>
+          <button class="btn-danger" onclick="toggleExcludeBuilderDish('${d.name}')">
+            ${builderSelection.excludedBuilderDishes.has(d.name) ? "Включити" : "Виключити"}
+          </button>
+        `;
+        container.appendChild(div);
+        return;
+      }
+      firstChoices.forEach(choice => {
+        const isExcluded = builderSelection.excludedBuilderDishes.has(choice.name);
+        const isSelected = builderSelection.dish && builderSelection.dish.name === choice.name;
+        const div = document.createElement("div");
+        div.className = "item" + (isExcluded ? " disabled" : "");
+        div.innerHTML = `
+          <div class="item-info">
+            <img src="${choice.img}" alt="${choice.name}">
+            <div class="item-details">
+              <strong>${choice.name}</strong>
+            </div>
+          </div>
+          <div class="navigation-buttons">
+            <button class="btn" onclick="selectBuilderDish('${choice.name}')" ${isExcluded ? 'disabled' : ''}>
+              ${isSelected ? "Обрано" : "Вибрати"}
+            </button>
+            <button class="btn-danger" onclick="toggleExcludeBuilderDish('${choice.name}')">
+              ${isExcluded ? "Включити" : "Виключити"}
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function selectBuilderDish(name) {
+      if (builderSelection.excludedBuilderDishes.has(name)) return;
+      builderSelection.dish = firstChoices.find(c => c.name === name);
+      renderFirstChoices();
+      document.getElementById("toSaucesBtn").disabled = false;
+    }
+
+    function toggleExcludeBuilderDish(name) {
+      if (builderSelection.excludedBuilderDishes.has(name)) {
+        builderSelection.excludedBuilderDishes.delete(name);
+      } else {
+        builderSelection.excludedBuilderDishes.add(name);
+        if (builderSelection.dish && builderSelection.dish.name === name) {
+          builderSelection.dish = null;
+          document.getElementById("toSaucesBtn").disabled = true;
+        }
+      }
+      renderFirstChoices();
+    }
+
+    function randomizeBuilderDish() {
+      const choices = firstChoices.filter(c => !builderSelection.excludedBuilderDishes.has(c.name));
+      if (choices.length === 0) {
+        alert("Немає доступних варіантів 😕");
+        return;
+      }
+      const pick = choices[Math.floor(Math.random() * choices.length)];
+      builderSelection.dish = pick;
+      renderFirstChoices();
+      document.getElementById("toSaucesBtn").disabled = false;
+    }
+
+    function toSauces() {
+      if (!builderSelection.dish) return;
+      document.getElementById('dishesTab').classList.remove('active');
+      document.getElementById('saucesTab').classList.add('active');
+      document.getElementById('drinksTab').classList.remove('active');
+    }
+
+    function renderSaucesList() {
+      const container = document.getElementById("saucesList");
+      container.innerHTML = '';
+      sauces.forEach(s => {
+        const isSelected = builderSelection.sauce && builderSelection.sauce.name === s.name;
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `
+          <div class="item-info">
+            <div class="item-details">
+              <strong>${s.name}</strong>
+            </div>
+          </div>
+          <button class="btn" onclick="selectBuilderSauce('${s.name}')">
+            ${isSelected ? "Обрано" : "Вибрати"}
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function selectBuilderSauce(name) {
+      builderSelection.sauce = sauces.find(s => s.name === name);
+      renderSaucesList();
+      document.getElementById("toDrinksBtn").disabled = false;
+    }
+
+    function randomizeBuilderSauce() {
+      const pick = sauces[Math.floor(Math.random() * sauces.length)];
+      builderSelection.sauce = pick;
+      renderSaucesList();
+      document.getElementById("toDrinksBtn").disabled = false;
+    }
+
+    function backToDishes() {
+      document.getElementById('saucesTab').classList.remove('active');
+      document.getElementById('dishesTab').classList.add('active');
+      document.getElementById('drinksTab').classList.remove('active');
+    }
+
+    function toDrinks() {
+      if (!builderSelection.sauce) return;
+      document.getElementById('saucesTab').classList.remove('active');
+      document.getElementById('drinksTab').classList.add('active');
+      document.getElementById('dishesTab').classList.remove('active');
+    }
+
+    function renderDrinksList() {
+      const container = document.getElementById("drinksList");
+      container.innerHTML = '';
+      drinksForBuilder.forEach(d => {
+        const isSelected = builderSelection.drink && builderSelection.drink.name === d.name;
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML = `
+          <div class="item-info">
+            <img src="${d.img}" alt="${d.name}">
+            <div class="item-details">
+              <strong>${d.name}</strong>
+            </div>
+          </div>
+          <button class="btn" onclick="selectBuilderDrink('${d.name}')">
+            ${isSelected ? "Обрано" : "Вибрати"}
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function selectBuilderDrink(name) {
+      builderSelection.drink = drinksForBuilder.find(d => d.name === name);
+      renderDrinksList();
+      document.getElementById("finishMenuBtn").disabled = false;
+    }
+
+    function randomizeBuilderDrink() {
+      const pick = drinksForBuilder[Math.floor(Math.random() * drinksForBuilder.length)];
+      builderSelection.drink = pick;
+      renderDrinksList();
+      document.getElementById("finishMenuBtn").disabled = false;
+    }
+
+    function backToSauces() {
+      document.getElementById('drinksTab').classList.remove('active');
+      document.getElementById('saucesTab').classList.add('active');
+      document.getElementById('dishesTab').classList.remove('active');
+    }
+
+    function finishMenu() {
+      const dishName = builderSelection.dish.name;
+      const sauceName = builderSelection.sauce.name;
+      const drinkName = builderSelection.drink.name;
+      alert(`Ваше меню:\n\nСтрава: ${dishName}\nСоус: ${sauceName}\nНапій: ${drinkName}`);
+      document.getElementById("menuBuilderSection").style.display = "none";
+      document.getElementById("menuSection").style.display = "block";
+      renderMenu();
+    }
+
+    function initFirstChoices() {
+      renderFirstChoices(false);
+      document.getElementById('dishesTab').classList.add('active');
+      document.getElementById('saucesTab').classList.remove('active');
+      document.getElementById('drinksTab').classList.remove('active');
+    }
+    initFirstChoices();
+  </script>
+</body>
+</html>
